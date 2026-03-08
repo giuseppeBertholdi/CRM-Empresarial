@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ATTENDANT
+  MANAGER
+  ADMIN
+}
+
+enum ConversationStatus {
+  OPEN
+  WAITING
+  CLOSED
+  QUOTE_SENT
+}
+
+enum SenderType {
+  USER
+  SYSTEM
+}
+
+model Department {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  users           User[]
+  conversations   Conversation[]
+  automationRules AutomationRule[]
+}
+
+model User {
+  id                    String               @id @default(cuid())
+  name                  String
+  email                 String               @unique
+  authUserId            String?              @unique
+  whatsappPhone         String?
+  whatsappPhoneNumberId String?
+  whatsappAccessToken   String?
+  role                  Role                 @default(ATTENDANT)
+  departmentId          String?
+  department            Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignedConversations Conversation[]       @relation("AssignedUserConversations")
+  messages              Message[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  createdRules          AutomationRule[]     @relation("RuleCreator")
+  activityLogs          ActivityLog[]
+}
+
+model Customer {
+  id            String         @id @default(cuid())
+  name          String
+  phone         String
+  email         String?
+  company       String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+
+  @@index([name])
+  @@index([createdAt])
+}
+
+model Conversation {
+  id            String             @id @default(cuid())
+  customerId    String
+  customer      Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  departmentId  String
+  department    Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  assignedToId  String?
+  assignedTo    User?              @relation("AssignedUserConversations", fields: [assignedToId], references: [id], onDelete: SetNull)
+  status        ConversationStatus @default(OPEN)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  lastMessageAt DateTime           @default(now())
+  messages      Message[]
+  reminderLogs  ReminderLog[]
+
+  @@index([departmentId, status])
+  @@index([assignedToId])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String?
+  sender         User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  senderType     SenderType   @default(USER)
+  content        String
+  providerMessageId String?   @unique
+  deliveryStatus    String?
+  deliveryUpdatedAt DateTime?
+  deliveryError     String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([providerMessageId])
+}
+
+model AutomationRule {
+  id              String             @id @default(cuid())
+  triggerStatus   ConversationStatus
+  delayHours      Int
+  messageTemplate String
+  isActive        Boolean            @default(true)
+  departmentId    String?
+  department      Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?              @relation("RuleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  reminderLogs    ReminderLog[]
+
+  @@index([triggerStatus, isActive])
+}
+
+model ReminderLog {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  ruleId         String
+  rule           AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  scheduledFor   DateTime
+  sentAt         DateTime?
+  status         String         @default("SCHEDULED")
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId])
+  @@index([ruleId])
+  @@index([status])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, createdAt])
+}
