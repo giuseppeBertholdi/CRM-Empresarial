@@ -3,7 +3,11 @@ import { ConversationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isQueueEnabled, remindersQueue } from "@/lib/queue";
 
-const REMINDER_PENDING_STATUSES = ["SCHEDULED", "PENDING_NO_QUEUE", "FAILED"] as const;
+const REMINDER_PENDING_STATUSES: string[] = [
+  "SCHEDULED",
+  "PENDING_NO_QUEUE",
+  "FAILED",
+];
 
 function buildReminderMessage(
   template: string,
